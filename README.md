@@ -1,4 +1,5 @@
-echipa seminar 3+4:
-Luca Andreea-Maria,
-Pistol Constantin,
-Toma Larisa-Andreea
+echipa proiect:
+Felecanu Cosmin
+Luca Andreea-Maria
+Mircea Roxana
+Pistol Constantin
