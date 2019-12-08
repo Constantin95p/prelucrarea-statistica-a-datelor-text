@@ -1,5 +1,5 @@
 echipa proiect:
-Felecanu Cosmin
-Luca Andreea-Maria
-Mircea Roxana
-Pistol Constantin
+Felecanu Cosmin,
+Luca Andreea-Maria,
+Mircea Roxana,
+Pistol Constantin,
