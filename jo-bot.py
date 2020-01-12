@@ -7,6 +7,7 @@ import wikipedia
 from nltk.tokenize import sent_tokenize
 
 TOPIC = 'olympic games'
+NR_INTREBARI = 5
 
 YEARS = ['1896', '1900', '1904', '1908', '1912', '1916', '1920', '1924', '1928', '1932', '1936', '1940', '1944', '1948', '1952', '1956', '1960', '1964', '1968', '1972', '1976', '1980', '1984', '1988', '1992', '1996', '2000', '2002', '2004', '2006', '2008', '2010', '2012', '2014', '2016', '2018', '2020', '2022']
 
@@ -124,6 +125,7 @@ def generate_questions_for(sec):
     # Stergem toate parantezele din text, pentru a procesa mai usor
     _sec = "".join(re.split('\(', sec.decode("utf-8").replace(")", "("))[0::2])
 
+    global questions
     questions = {}
     # pentru fiecare fraza, o tokenizam si generam posibile intrebari
     # din fiecare fraza, cu ajutorul procesarii NLTK, scoatem numerele si locatiile, din care vom genera apoi intrebarile
@@ -207,7 +209,8 @@ def display_questions(questions):
     # nr de raspunsuri corecte va fi 0 la inceput
     raspunsuri_corecte = 0
     # retine numarul intrebarii la care s-a ajuns
-    qno = 1
+    qno = 0
+    resp_map = {}
     # parcurgem fiecare intrebare generata
     for key, value in questions.items():
         # daca nu exista posibile raspunsuri, sarim peste intrebare si trecem la urmatoarea fara sa afisam nimic
@@ -234,88 +237,222 @@ def display_questions(questions):
             # in caz ca raspunsul contine numere si litere (ex. "20 gold") vom pastra acelasi patern si doar inlocuim numerele
             if re.match('^[0-9]+\w+', value[index][1]) and value[index][0] == 'NUMBER':
                 nr = value[index][1].split(' ')[0]
-                nr_responses = generate_responses(nr, value[index][0])
-                responses = []
-                for resp in range(len(nr_responses)):
-                    responses.append(nr_responses[resp] + ' ' + ' '.join(value[index][1].split(' ')[1:]))
+                try:
+                    nr_responses = generate_responses(nr, value[index][0])
+                    responses = []
+                    for resp in range(len(nr_responses)):
+                        responses.append(nr_responses[resp] + ' ' + ' '.join(value[index][1].split(' ')[1:]))
+                except:
+                    continue
             else:
                 # sarim peste intrebarea aceasta daca nu se pot genera grilele
                 continue
 
-        # cream un dictionar cu grilele de forma:
+        # cream un dictionar cu fiecare intrebare de forma:
         #    a -> raspuns 1
         #    b -> raspuns 2
         #    c -> raspuns 3
         #    d -> raspuns 4
-        resp_map = {}
-        resp_map['a'] = responses[0]
-        resp_map['b'] = responses[1]
-        resp_map['c'] = responses[2]
-        resp_map['d'] = responses[3]
-        print('''Q{}/{} {}
-        a. {}
-        b. {}
-        c. {}
-        d. {} 
-        '''.format(qno, len(questions), q, resp_map['a'], resp_map['b'], resp_map['c'], resp_map['d']))
+        #    QUESTION -> intrebarea
+        #    CORRECT -> raspunsul corect
+        resp_map[qno] = {}
 
-        # asteptam raspunsul utilizatorului
-        user_resp = input('> Your answer here (a, b, c, or d): ')
-        while user_resp.lower() not in ['a', 'b', 'c', 'd', 'q']:
-            # utilizatorul trebuie sa raspunda doar "a", "b", "c" sau "d", altfel va fi atentionat si nu va putea continua pana nu da un raspuns
-            print('JO: Please answer with a, b, c, or d!')
-            user_resp = input('> Your answer here (a, b, c, or d): ')
-        # 'q' inseamna ca utilizatorul renunta sa mai raspunda
-        if user_resp == 'q':
+        resp_map[qno]['QUESTION'] = q
+        resp_map[qno]['CORRECT'] = value[index][1]
+        resp_map[qno]['a'] = responses[0]
+        resp_map[qno]['b'] = responses[1]
+        resp_map[qno]['c'] = responses[2]
+        resp_map[qno]['d'] = responses[3]
+
+        qno += 1
+        # daca s-a ajuns la nr maxim de intrebari, se opreste
+        if qno == NR_INTREBARI:
             break
 
-        # verificarea raspunsului
-        if resp_map[user_resp.lower()] == value[index][1]:
-            print('JO: Correct!')
-            raspunsuri_corecte += 1
+    return resp_map
+
+
+#########################################
+# Interfata grafica #####################
+#########################################
+
+'''
+Vor fi 3 ferestre:
+1. Intro: de aici se pot genera intrebari in functie de un topic introdus
+2. Intrebari: afisarea intrebarilor grila
+3. Final: afisarea scorului si posibilitatea de a genera un alt set de intrebari pentru un alt topic
+'''
+
+from kivy.app import App
+from kivy.lang import Builder
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.properties import ObjectProperty
+from kivy.uix.popup import Popup
+from kivy.uix.label import Label
+from kivy.clock import Clock
+
+class WindowManager(ScreenManager):
+    intro = ObjectProperty(None)
+    intrebari = ObjectProperty(None)
+
+class Intro(Screen):
+    '''
+    Fereastra de introducere, care contine:
+    - mesajul de introducere al botului
+    - input-ul de introdus topicul pentru care sa fie generate intrebarile
+    - butonul care genereaza intrebarile
+    '''
+    
+    bot = ObjectProperty(None)
+
+    def generate(self):
+        '''
+        Genereaza setul de intrebari, in functie de topicul ales de utilizator
+        '''
+        topic = Intro.current = self.topic.text
+        try:
+            found_sentences = get_wiki_page(TOPIC + ' ' + topic)
+            questions = generate_questions_for(found_sentences)
+        except Exception as e:
+            # in caz ca apare o eroare in timpul generarii intrebarilor, afiseaza un mesaj si ramane pe aceeasi fereastra
+            print(e)
+            self.bot.text = 'JO: Sorry! I found nothing about ' + topic + '. Please try something else.'
         else:
-            print('JO: Wrong! Correct answer is:', value[index][1])
-        qno += 1
+            # daca intrebarile au fost generate corect, se trece la fereastra urmatoare, care le afiseaza
+            sm.current = 'intrebari'
 
-    print('JO: No more questions')
-    return raspunsuri_corecte
+class Intrebari(Screen):
+    '''
+    Fereastra cu intrebarile, care contine:
+    - intrebarea
+    - grilele (a, b, c, d)
+    - un buton de finalizare imediata a testului
+    '''
 
+    question = ObjectProperty(None)
+    ans1 = ObjectProperty(None)
+    ans2 = ObjectProperty(None)
+    ans3 = ObjectProperty(None)
+    ans4 = ObjectProperty(None)
+    questions = ObjectProperty(None)
 
-continue_dialogue = True
-print("Hello. I am JO. Write a topic to generate questions about Olympic Games.")
-human_text = input()
-human_text = human_text.lower()
-while continue_dialogue == True:
-    if human_text != 'bye':
-        if human_text == 'thanks' or human_text == 'thank you very much' or human_text == 'thank you':
-            continue_dialogue = False
-            print("JO: Most welcome")
+    def on_enter(self, *args):
+        '''
+        Prima data cand se intra pe aceasta fereastra, se genereaza dictionarul cu intrebarile si raspunsurile grila
+        '''
+        self.resp_map = display_questions(questions)
+
+        self.question.text = 'Q1/' + str(len(self.resp_map)) + ' - ' + self.resp_map[0]['QUESTION']
+        self.ans1.text = self.resp_map[0]['a']
+        self.ans2.text = self.resp_map[0]['b']
+        self.ans3.text = self.resp_map[0]['c']
+        self.ans4.text = self.resp_map[0]['d']
+        self.last_question = 0
+        
+        global right_answers
+        right_answers = 0
+        global len_questions
+        len_questions = len(self.resp_map)
+
+    def answer(self, ans):
+        '''
+        Fiecare buton cu raspunsurile grila (a, b, c, d) apeleaza functia aceasta care:
+        1. verifica raspunsul
+        2. afiseaza intrebarea urmatoare
+        '''
+        if self.resp_map[self.last_question][ans] == self.resp_map[self.last_question]['CORRECT']:
+            # daca raspunsul este corect, se adauga la numaratoarea raspunsurilor corecte, pentru a fi afisate la final
+            global right_answers
+            right_answers += 1
+
+        self.last_question += 1
+        if self.last_question == len(self.resp_map):
+            # daca s-a ajuns la ultima intrebare, se trece la urmatoarea fereastra, numita "final"
+            sm.current = 'final'
         else:
-            print("JO: ", end="")
-            try:
-                found_sentences = get_wiki_page(TOPIC + ' ' + human_text)
-                questions = generate_questions_for(found_sentences)
-            except Exception as e:
-                print('JO: Sorry! I found nothing about ' + human_text + '. Please try something else.')
+            # daca nu s-a ajuns la ultima intrebare, toate campurile sunt populate cu detaliile intrebarii urmatoare
+            self.question.text = 'Q' + str(self.last_question+1) + '/' + str(len(self.resp_map)) + ' - ' + self.resp_map[self.last_question]['QUESTION']
+            self.ans1.text = self.resp_map[self.last_question]['a']
+            self.ans2.text = self.resp_map[self.last_question]['b']
+            self.ans3.text = self.resp_map[self.last_question]['c']
+            self.ans4.text = self.resp_map[self.last_question]['d']
 
+    def finish_test(self):
+        '''
+        Functie apelata la apasarea butonului "Finish test"
+        Finalizeaza testul oricand, indiferent de intrebarea la care s-a ajuns, si trece la urmatoarea fereastra care arata scorul
+        '''
+        global len_questions
+        len_questions = self.last_question
+        sm.current = 'final'
+
+class Final(Screen):
+    '''
+    Fereastra finala care arata:
+    - Scorul
+    - Posibilitatea de a genera un alt set de intrebari pentru un nou topic
+    '''
+    
+    bot = ObjectProperty(None)
+
+    def on_pre_enter(self, *args):
+        '''
+        Functie apelata inainte de a fi afisata fereastra "final", pentru a calcula scorul si a sti ultimul topic introdus
+        '''
+        # extragerea ultimului topic introdus
+        self.last_topic = sm.screens[0].ids.topic.text
+        if self.last_topic == '':
             try:
-                raspunsuri_corecte = display_questions(questions)
-                # calculam cat la suta din raspunsuri au fost corecte
-                ratio = (raspunsuri_corecte * 100) / len(questions)
-                print('JO: You answered to {} of {} questions. Your ratio is {}'.format(raspunsuri_corecte, len(questions), ratio))
-            except Exception as e:
-                pass
-            finally:
-                print('JO: Write "more" to find out more details about {}. Or type another topic to generate another set of questions.\n>'.format(human_text))
-                user_resp2 = input()
-                if user_resp2.lower() == 'more':
-                    print('JO: Ok. I am searching for more details about {}.'.format(human_text))
-                    print(generate_response_more_details(human_text))
-                    print('JO: Write a topic to generate questions')
-                    human_text = input()
-                    human_text = human_text.lower()
-                else:
-                    human_text = user_resp2.lower()
-    else:
-        continue_dialogue = False
-        print("JO: Bye!")
+                self.last_topic = sm.screens[2].ids.topic.text
+            except:
+                self.last_topic = TOPIC
+        
+        # calcularea scorului
+        global right_answers, len_questions
+        if len_questions != 0:
+            ratio = (right_answers * 100) / len_questions
+        else:
+            ratio = 0
+        self.scor.text = 'JO: You answered to {} of {} questions. Your ratio is {}'.format(right_answers, len_questions, ratio)
+
+    def generate(self):
+        '''
+        Genereaza setul de intrebari, in functie de topicul ales de utilizator
+        '''
+        topic = Intro.current = self.topic.text
+        try:
+            found_sentences = get_wiki_page(TOPIC + ' ' + topic)
+            questions = generate_questions_for(found_sentences)
+        except Exception as e:
+            # in caz ca apare o eroare in timpul generarii intrebarilor, afiseaza un mesaj si ramane pe aceeasi fereastra
+            print(e)
+            self.scor.text = 'JO: Sorry! I found nothing about ' + topic + '. Please try something else.'
+        else:
+            # daca intrebarile au fost generate corect, se trece la fereastra urmatoare, care le afiseaza
+            sm.current = 'intrebari'
+    
+
+
+# construieste interfata setata in fisierul "interfata.kv"
+kv = Builder.load_file("interfata.kv")
+
+sm = WindowManager()
+# adauga in interfata cele 3 ferestre: Intro, Intrebari si Final
+screens = [Intro(name='intro'), Intrebari(name='intrebari'), Final(name='final')]
+for screen in screens:
+    sm.add_widget(screen)
+
+# seteaza prima pagina
+sm.current = "intro"
+
+class MyMainApp(App):
+    def build(self):
+        return sm
+
+# variabile globale pentru a retine nr raspunsurilor corecte si nr intrebarilor
+global right_answers
+global len_questions
+
+if __name__ == "__main__":
+    MyMainApp().run()
+

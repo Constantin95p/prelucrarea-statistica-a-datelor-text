@@ -1,0 +1,108 @@
+<Intro>:
+    name:"intro"
+
+    topic: topic
+    bot: bot 
+
+    BoxLayout:
+        orientation:"vertical"
+
+        Label:
+            id: bot
+            text:"Hello. I am JO. Write a topic to generate questions about Olympic Games."
+            font_size: 15
+            split_str:'rr'
+            canvas.before:
+                Rectangle:
+                    pos: self.pos
+                    size: (100, 100)
+                    source: 'jo.png'
+        TextInput:
+            id: topic
+            font_size: 15
+            multiline: False
+            size_hint: 0.4, 0.15
+        Button:
+            text:'Generate quiz'
+            size:30,30
+            on_release:
+            	root.generate()
+
+<Intrebari>:
+    name:"intrebari"
+    #topic: topic
+    question: question
+    ans1: ans1
+    ans2: ans2
+    ans3: ans3
+    ans4: ans4
+    BoxLayout:
+        orientation:"vertical"
+
+        Label:
+            id: question
+            text:""
+            text_size: self.width, None
+            size_hint: 1, None
+        Button:
+            id: ans1
+            size:30,30
+            on_release: root.answer('a')
+            
+        Button:
+            id: ans2
+            size:30,30
+            on_release: root.answer('b')
+        Button:
+            id: ans3
+            size:30,30
+            on_release: root.answer('c')
+        Button:
+            id: ans4
+            size:30,30
+            on_release: root.answer('d')
+        
+        Button:
+            id: close
+            text:' Finish test'
+            size:10,10
+            on_release: root.finish_test()
+
+<Final>:
+    name:"final"
+
+    topic: topic
+    scor: scor
+    bot: bot
+
+    BoxLayout:
+        orientation:"vertical"
+
+        Label:
+            id: scor
+            font_size: 15
+            split_str:'rr'
+            canvas.before:
+                Rectangle:
+                    pos: self.pos
+                    size: (100, 100)
+                    source: 'jo.png'
+
+        Label:
+            id: bot
+            text_size: self.width, None
+            size_hint: 1, None
+            font_size: 15
+            split_str:'rr'
+        TextInput:
+            id: topic
+            font_size: 15
+            multiline: False
+            size_hint: 0.4, 0.15
+        Button:
+            id: generate
+            text:'Generate quiz'
+            size:30,30
+            on_release:
+            	root.generate()
+       
